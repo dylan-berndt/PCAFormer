@@ -1,0 +1,11 @@
+{
+    "epochs": 40,
+    "batchSize": 32,
+    "model": {
+        "layers": 12,
+        "patchWidth": 16
+    },
+    "dataset": {
+
+    }
+}
