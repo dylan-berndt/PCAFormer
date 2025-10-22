@@ -14,7 +14,7 @@
                 "batch_first": true
             }
         },
-        "patchLayerCompression": 2,
+        "patchLayerCompression": 1,
         "patchLayerStride": 2
     },
     "dataset": {
