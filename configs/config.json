@@ -18,6 +18,12 @@
         "patchLayerStride": 2
     },
     "dataset": {
-
+        "dataDir": "/Users/tony/.cache/kagglehub/datasets/aryankaushik005/custom-dataset/versions/1/content",
+        "trainDir": "",
+        "valDir": "",
+        "trainValSplit": 0.8,
+        "seed": 42,
+        "numWorkers": 4,
+        "augment": true
     }
 }
