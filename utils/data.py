@@ -6,6 +6,35 @@ import torch
 from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms as T
 
+from pathlib import Path
+import kagglehub
+
+
+def download_dataset():
+    # 1) Download the dataset
+    path = kagglehub.dataset_download("aryankaushik005/custom-dataset")
+    print("KaggleHub dataset path:", path)
+
+    # 2) Find the directory that contains both real_images and fake_images
+    root = Path(path)
+    # KaggleHub may place files under a nested 'content' or similar folder; search for the class dirs
+    candidates = []
+    for p in [root, *root.rglob("*")]:
+        if p.is_dir():
+            real = p / "real_images"
+            fake = p / "fake_images"
+            if real.is_dir() and fake.is_dir():
+                candidates.append(p)
+
+    if not candidates:
+        raise FileNotFoundError(
+            "Could not locate a directory containing both 'real_images' and 'fake_images'. Inspect the downloaded path and adjust.")
+
+    # Choose the deepest match to avoid picking a higher-level folder accidentally
+    candidates = sorted(candidates, key=lambda x: len(str(x)))
+    data_dir = str(candidates[-1])
+    return data_dir
+
 
 def _build_transforms(image_size: int, augment: bool) -> Tuple[T.Compose, T.Compose]:
     train_tfms = [
