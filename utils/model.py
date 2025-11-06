@@ -4,7 +4,7 @@ import torch.nn as nn
 import os
 import copy
 import time
-from torchvision.models import swin_v2_t, resnet50
+from torchvision.models import swin_v2_t, resnet50, ResNet50_Weights, Swin_V2_T_Weights
 
 
 class PatchEmbedding(nn.Module):
@@ -39,8 +39,11 @@ class PCAFormerLayer(nn.Module):
     def forward(self, x):
         if x.shape[1] != self.config.k:
             x = torch.transpose(x, 1, 2)
+            std = x.std(dim=-1, keepdim=True)
+            x = (x - x.mean(dim=-1, keepdim=True)) / std
             u, s, v = torch.pca_lowrank(x, center=True, q=self.config.k)
             x = torch.matmul(x, v[:, :, :self.config.k])
+            x = x * std
             x = torch.transpose(x, 1, 2)
 
         x = self.transformer(x)
@@ -93,7 +96,7 @@ class ResNet50(nn.Module):
         super().__init__()
 
         self.config = config
-        self.model = resnet50(weights=None)
+        self.model = resnet50(weights=ResNet50_Weights.IMAGENET1K_V1)
 
         features = self.model.fc.in_features
         self.model.fc = nn.Sequential(
@@ -110,7 +113,7 @@ class SwinTransformerV2Tiny(nn.Module):
         super().__init__()
 
         self.config = config
-        self.model = swin_v2_t(weights=None)
+        self.model = swin_v2_t(weights=Swin_V2_T_Weights.IMAGENET1K_V1)
 
         features = self.model.head.in_features
         self.model.head = nn.Sequential(

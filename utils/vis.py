@@ -19,11 +19,12 @@ DISPLAY_REFRESH = 0.1
 
 
 class Client:
-    def __init__(self, host, port=12954):
+    def __init__(self, host, port=12001):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.connect((host, port))
 
     def send(self, name, data):
+        self.socket.recv(4096)
         collated = f" | {name}||{data}"
         self.socket.sendall(bytes(collated, encoding='utf-8'))
 
@@ -40,6 +41,8 @@ class Server:
 
         self.socket.listen(1)
         self.client = None
+
+        self.exit = False
 
         self.accept()
 
@@ -84,7 +87,7 @@ class DataGUI:
         self.server = server
         self.root = tk.Tk()
         self.root.title("Model Tracker")
-    
+
         self.frame = ttk.Frame(self.root)
         self.frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
@@ -112,14 +115,18 @@ class DataGUI:
         self.updatePlots()
 
     def _on_mousewheel(self, event):
-        self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
     def dataCollection(self):
         while self.running:
             try:
+                self.server.client.sendall(bytes("ping", encoding='utf-8'))
                 self.server.receive()
             except (ValueError, BlockingIOError):
                 pass
+            except ConnectionResetError:
+                self.running = False
+                self.root.after(0, self.root.destroy)
             time.sleep(0.01)
 
     def createPlot(self, name, row, col):
@@ -154,7 +161,7 @@ class DataGUI:
         if not self.server.data:
             self.root.after(int(DISPLAY_REFRESH * 1000), self.updatePlots)
             return
-        
+
         currentDataSeries = set(self.server.data.keys())
         existingPlots = set(self.plots.keys())
 
@@ -185,7 +192,7 @@ class DataGUI:
                 display = datum[len(datum) - (MAX_DISPLAY_POINTS + 1):]
                 ax2.plot(points, display, label=name, alpha=0.7)
                 ax2.axhline(np.mean(display), linestyle='--', color='orange')
-            
+
             ax1.legend()
             ax2.legend()
 
@@ -201,7 +208,10 @@ class DataGUI:
 
 
 if __name__ == "__main__":
-    server = Server()
-    gui = DataGUI(server)
-    gui.run()
+    while True:
+        server = Server(port=12945)
+        gui = DataGUI(server)
+        gui.run()
+        server.socket.close()
+        del server
 

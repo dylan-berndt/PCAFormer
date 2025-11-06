@@ -62,7 +62,7 @@ def _has_dir(path: str) -> bool:
     return isinstance(path, str) and len(path) > 0 and os.path.isdir(path)
 
 
-def get_datasets(cfg) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset, Dict[int, str]]:
+def get_datasets(cfg, device="cpu") -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset, Dict[int, str]]:
     image_size = int(cfg.model.imageSize)
     augment = bool(getattr(cfg.dataset, "augment", True))
     train_tfms, val_tfms = _build_transforms(image_size, augment)
@@ -80,28 +80,24 @@ def get_datasets(cfg) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Datase
     if not _has_dir(data_dir):
         raise FileNotFoundError("dataset.dataDir is not a valid directory and train/val dirs not provided")
 
-    base_train = datasets.ImageFolder(data_dir, transform=train_tfms)
-    base_val = datasets.ImageFolder(data_dir, transform=val_tfms)
+    base_ds = datasets.ImageFolder(data_dir, transform=train_tfms)
 
     split = float(getattr(cfg.dataset, "trainValSplit", 0.8))
     seed = int(getattr(cfg.dataset, "seed", 42))
 
-    n = len(base_train)
+    n = len(base_ds)
     n_train = int(n * split)
     n_val = n - n_train
 
-    g = torch.Generator().manual_seed(seed)
-    train_subset, val_subset = torch.utils.data.random_split(range(n), [n_train, n_val], generator=g)
+    g = torch.Generator(device=device).manual_seed(seed)
+    train_ds, val_ds = torch.utils.data.random_split(base_ds, [n_train, n_val], generator=g)
 
-    train_ds = Subset(base_train, train_subset.indices)
-    val_ds = Subset(base_val, val_subset.indices)
-
-    classes = {i: c for i, c in enumerate(base_train.classes)}
+    classes = {i: c for i, c in enumerate(base_ds.classes)}
     return train_ds, val_ds, classes
 
 
-def get_dataloaders(cfg):
-    train_ds, val_ds, classes = get_datasets(cfg)
+def get_dataloaders(cfg, device="cpu"):
+    train_ds, val_ds, classes = get_datasets(cfg, device)
 
     batch_size = int(cfg.batchSize)
     num_workers = int(getattr(cfg.dataset, "numWorkers", 4))
@@ -113,6 +109,7 @@ def get_dataloaders(cfg):
         shuffle=True,
         num_workers=num_workers,
         pin_memory=pin_memory,
+        generator=torch.Generator(device=device)
     )
 
     val_loader = DataLoader(
@@ -121,6 +118,7 @@ def get_dataloaders(cfg):
         shuffle=False,
         num_workers=num_workers,
         pin_memory=pin_memory,
+        generator=torch.Generator(device=device)
     )
 
     return {
