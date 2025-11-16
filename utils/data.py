@@ -10,9 +10,15 @@ from pathlib import Path
 import kagglehub
 
 
-def download_dataset():
+checkDirectories = {"aryankaushik005/custom-dataset": ["real_images", "fake_images"],
+                    "dimensi0n/imagenet-256": ["abacus", "admiral", "agama"]}
+
+
+def download_dataset(name=None):
+    name = name if name is not None else "aryankaushik005/custom-dataset"
+
     # 1) Download the dataset
-    path = kagglehub.dataset_download("aryankaushik005/custom-dataset")
+    path = kagglehub.dataset_download(name)
     print("KaggleHub dataset path:", path)
 
     # 2) Find the directory that contains both real_images and fake_images
@@ -21,9 +27,13 @@ def download_dataset():
     candidates = []
     for p in [root, *root.rglob("*")]:
         if p.is_dir():
-            real = p / "real_images"
-            fake = p / "fake_images"
-            if real.is_dir() and fake.is_dir():
+            broke = False
+            for directory in checkDirectories[name]:
+                if not (p / directory).is_dir():
+                    broke = True
+                    break
+
+            if not broke:
                 candidates.append(p)
 
     if not candidates:

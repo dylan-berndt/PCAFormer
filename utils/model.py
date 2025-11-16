@@ -74,10 +74,7 @@ class PCAFormer(nn.Module):
 
         self.transformer = nn.Sequential(*self.layers)
         
-        self.classification = nn.Sequential(
-            nn.Linear(config.embedDim, 1),
-            nn.Sigmoid()
-        )
+        self.classification = nn.Linear(config.embedDim, config.classes)
         
     def forward(self, x):
         x = self.patching(x)
@@ -96,13 +93,10 @@ class ResNet50(nn.Module):
         super().__init__()
 
         self.config = config
-        self.model = resnet50(weights=ResNet50_Weights.IMAGENET1K_V1)
+        self.model = resnet50(weights=None)
 
         features = self.model.fc.in_features
-        self.model.fc = nn.Sequential(
-            nn.Linear(features, 1),
-            nn.Sigmoid()
-        )
+        self.model.fc = nn.Linear(features, config.classes)
 
     def forward(self, x):
         return self.model(x)
@@ -113,13 +107,10 @@ class SwinTransformerV2Tiny(nn.Module):
         super().__init__()
 
         self.config = config
-        self.model = swin_v2_t(weights=Swin_V2_T_Weights.IMAGENET1K_V1)
+        self.model = swin_v2_t(weights=None)
 
         features = self.model.head.in_features
-        self.model.head = nn.Sequential(
-            nn.Linear(features, 1),
-            nn.Sigmoid()
-        )
+        self.model.head = nn.Linear(features, config.classes)
 
     def forward(self, x):
         return self.model(x)

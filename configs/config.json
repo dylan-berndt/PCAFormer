@@ -1,22 +1,24 @@
 {
-    "epochs": 40,
-    "batchSize": 32,
+    "epochs": 80,
+    "batchSize": 64,
     "learningRate": 1e-3,
+    "cacheDir": "F:/.cache/kagglehub",
     "model": {
         "layers": 12,
         "patchSize": 16,
         "imageSize": 256,
-        "embedDim": 128,
+        "embedDim": 256,
         "layer": {
             "transformer": {
-                "d_model": 128,
+                "d_model": 256,
                 "nhead": 8,
-                "dim_feedforward": 512,
+                "dim_feedforward": 1024,
                 "batch_first": true
             }
         },
         "patchLayerCompression": 2,
-        "patchLayerStride": 2
+        "patchLayerStride": 2,
+        "classes": 1000
     },
     "dataset": {
         "dataDir": "/Users/tony/.cache/kagglehub/datasets/aryankaushik005/custom-dataset/versions/1/content",

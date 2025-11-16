@@ -30,7 +30,7 @@ class Client:
 
 
 class Server:
-    def __init__(self, port=12954):
+    def __init__(self, port=12955):
         self.data = {}
         self.time = {}
 
@@ -209,7 +209,7 @@ class DataGUI:
 
 if __name__ == "__main__":
     while True:
-        server = Server(port=12945)
+        server = Server(port=13297)
         gui = DataGUI(server)
         gui.run()
         server.socket.close()
