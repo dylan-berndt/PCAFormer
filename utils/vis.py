@@ -209,7 +209,7 @@ class DataGUI:
 
 if __name__ == "__main__":
     while True:
-        server = Server(port=13297)
+        server = Server(port=12954)
         gui = DataGUI(server)
         gui.run()
         server.socket.close()
