@@ -38,13 +38,14 @@ class PCAFormerLayer(nn.Module):
 
     def forward(self, x):
         if x.shape[1] != self.config.k:
-            x = torch.transpose(x, 1, 2)
-            std = x.std(dim=-1, keepdim=True)
-            x = (x - x.mean(dim=-1, keepdim=True)) / std
-            u, s, v = torch.pca_lowrank(x, center=True, q=self.config.k)
-            x = torch.matmul(x, v[:, :, :self.config.k])
-            x = x * std
-            x = torch.transpose(x, 1, 2)
+            with torch.no_grad():
+                x = torch.transpose(x, 1, 2)
+                # std = x.std(dim=-1, keepdim=True)
+                # x = (x - x.mean(dim=-1, keepdim=True)) / std
+                u, s, v = torch.pca_lowrank(x, center=True, q=self.config.k)
+                x = torch.matmul(x, v[:, :, :self.config.k])
+                # x = x * std
+                x = torch.transpose(x, 1, 2)
 
         x = self.transformer(x)
 
