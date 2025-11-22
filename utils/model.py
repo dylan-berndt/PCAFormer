@@ -4,7 +4,7 @@ import torch.nn as nn
 import os
 import copy
 import time
-from torchvision.models import swin_v2_t, resnet50, ResNet50_Weights, Swin_V2_T_Weights
+from torchvision.models import swin_v2_t, resnet50, ResNet50_Weights, Swin_V2_T_Weights, VisionTransformer
 
 
 class PatchEmbedding(nn.Module):
@@ -34,22 +34,49 @@ class PCAFormerLayer(nn.Module):
         super().__init__()
 
         self.config = config
-        self.transformer = nn.TransformerEncoderLayer(**config.transformer)
+        self.ln1 = nn.LayerNorm(config.transformer.d_model)
+        self.attn = nn.MultiheadAttention(config.transformer.d_model, config.transformer.nhead,
+                                          batch_first=config.transformer.batch_first)
+        self.dropout = nn.Dropout(config.transformer.dropout)
+
+        self.ln2 = nn.LayerNorm(config.transformer.d_model)
+
+        self.mlp = nn.Sequential(
+            nn.Linear(config.transformer.d_model, config.transformer.dim_feedforward),
+            nn.LayerNorm(config.transformer.dim_feedforward),
+            nn.GELU(),
+            nn.Dropout(config.transformer.dropout),
+            nn.Linear(config.transformer.dim_feedforward, config.transformer.d_model),
+            nn.Dropout(config.transformer.dropout)
+        )
 
     def forward(self, x):
-        if x.shape[1] != self.config.k:
+        if x.shape[1] != self.config.k + 1:
             with torch.no_grad():
-                x = torch.transpose(x, 1, 2)
+                x2 = x[:, 1:]
+                x2 = torch.transpose(x2, 1, 2)
                 # std = x.std(dim=-1, keepdim=True)
                 # x = (x - x.mean(dim=-1, keepdim=True)) / std
-                u, s, v = torch.pca_lowrank(x, center=True, q=self.config.k)
-                x = torch.matmul(x, v[:, :, :self.config.k])
+                x1 = torch.zeros([x2.shape[0], x2.shape[1], self.config.k])
+                for b in range(x2.shape[0]):
+                    u, s, v = torch.pca_lowrank(x2[b], center=True, q=self.config.k)
+                    x1[b] = torch.matmul(x2[b], v[:, :self.config.k])
+                # u, s, v = torch.pca_lowrank(x2, center=True, q=self.config.k)
+                # x1 = torch.matmul(x2, v[:, :, :self.config.k])
                 # x = x * std
-                x = torch.transpose(x, 1, 2)
+                x2 = torch.transpose(x1, 1, 2)
+                x = torch.cat([x[:, 0].unsqueeze(1), x2], dim=1)
 
-        x = self.transformer(x)
+        i = x
+        x = self.ln1(x)
+        x, _ = self.attn(x, x, x, need_weights=False)
+        x = self.dropout(x)
+        x = x + i
 
-        return x
+        y = self.ln2(x)
+        y = self.mlp(y)
+
+        return x + y
     
 
 class PCAFormer(nn.Module):
@@ -59,6 +86,8 @@ class PCAFormer(nn.Module):
         self.config = config
 
         self.patching = PatchEmbedding(config)
+
+        self.classToken = nn.Parameter(torch.zeros(1, 1, config.embedDim))
 
         self.layers = nn.ModuleList([])
 
@@ -80,9 +109,12 @@ class PCAFormer(nn.Module):
     def forward(self, x):
         x = self.patching(x)
 
+        classToken = self.classToken.expand(x.shape[0], -1, -1)
+        x = torch.cat([classToken, x], dim=1)
+
         x = self.transformer(x)
 
-        x = torch.mean(x, dim=1)
+        x = x[:, 0]
 
         x = self.classification(x)
 
@@ -115,6 +147,16 @@ class SwinTransformerV2Tiny(nn.Module):
 
     def forward(self, x):
         return self.model(x)
+
+
+class VisionTransformerWrapper(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+
+        self.m = VisionTransformer(256, 16, 12, 8, 128, 512)
+
+    def forward(self, x):
+        return self.m(x)
     
 
 def testModel(model, samples, batchSize):
