@@ -4,7 +4,8 @@ import torch.nn as nn
 import os
 import copy
 import time
-from torchvision.models import swin_v2_t, resnet50, ResNet50_Weights, Swin_V2_T_Weights, VisionTransformer
+from torchvision.models import swin_v2_t, resnet50, vit_b_16, ResNet50_Weights, \
+    Swin_V2_T_Weights, VisionTransformer, ViT_B_16_Weights
 
 
 class PatchEmbedding(nn.Module):

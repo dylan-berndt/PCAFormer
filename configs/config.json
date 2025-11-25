@@ -1,7 +1,7 @@
 {
     "epochs": 80,
     "batchSize": 64,
-    "learningRate": 3e-3,
+    "learningRate": 1e-3,
     "cacheDir": "F:/.cache/kagglehub",
     "model": {
         "layers": 12,
@@ -14,7 +14,7 @@
                 "nhead": 8,
                 "dim_feedforward": 2048,
                 "batch_first": true,
-                "dropout": 0.2
+                "dropout": 0.1
             }
         },
         "patchLayerCompression": 2,
