@@ -9,6 +9,8 @@ from torchvision import datasets, transforms as T
 from pathlib import Path
 import kagglehub
 
+import re
+
 
 checkDirectories = {"aryankaushik005/custom-dataset": ["real_images", "fake_images"],
                     "dimensi0n/imagenet-256": ["abacus", "admiral", "agama"]}
@@ -68,29 +70,58 @@ def _build_transforms(image_size: int, augment: bool) -> Tuple[T.Compose, T.Comp
     return T.Compose(train_tfms), val_tfms
 
 
+class ImageNetTransform:
+    def __init__(self, mapping):
+        self.mapping = mapping
+
+    def __call__(self, target):
+        return self.mapping[target]
+
+
 def _has_dir(path: str) -> bool:
     return isinstance(path, str) and len(path) > 0 and os.path.isdir(path)
 
 
-def get_datasets(cfg, device="cpu") -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset, Dict[int, str]]:
+def get_datasets(cfg, device="cpu", transform=None) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset, Dict[int, str]]:
     image_size = int(cfg.model.imageSize)
     augment = bool(getattr(cfg.dataset, "augment", True))
-    train_tfms, val_tfms = _build_transforms(image_size, augment)
+    if transform is None:
+        train_tfms, val_tfms = _build_transforms(image_size, augment)
+    else:
+        train_tfms, val_tfms = transform, transform
 
     train_dir = getattr(cfg.dataset, "trainDir", "")
     val_dir = getattr(cfg.dataset, "valDir", "")
     data_dir = getattr(cfg.dataset, "dataDir", "")
 
+    # So glad that NLP had to butt its way into this
+    folder_names = [os.path.basename(f.path) for f in os.scandir(data_dir) if f.is_dir()]
+    folder_names = sorted(folder_names)
+    synsets = open("LOC_synset_mapping.txt", "r").read().split("\n")
+    synsets = [s[10:].split(", ") for s in synsets]
+    synsets = [[re.sub(r'[^\w\s]', ' ', n).lower().replace("  ", " ") for n in s] for s in synsets]
+    mapping = {}
+    for i, name in enumerate(folder_names):
+        found = False
+        for s, synset in enumerate(synsets):
+            if name.lower().replace("_", " ") in synset:
+                found = True
+                mapping[i] = s
+                break
+        if not found:
+            print(name, i)
+    target_transform = ImageNetTransform(mapping)
+
     if _has_dir(train_dir) and _has_dir(val_dir):
-        train_ds = datasets.ImageFolder(train_dir, transform=train_tfms)
-        val_ds = datasets.ImageFolder(val_dir, transform=val_tfms)
+        train_ds = datasets.ImageFolder(train_dir, transform=train_tfms, target_transform=target_transform)
+        val_ds = datasets.ImageFolder(val_dir, transform=val_tfms, target_transform=target_transform)
         classes = {i: c for i, c in enumerate(train_ds.classes)}
         return train_ds, val_ds, classes
 
     if not _has_dir(data_dir):
         raise FileNotFoundError("dataset.dataDir is not a valid directory and train/val dirs not provided")
 
-    base_ds = datasets.ImageFolder(data_dir, transform=train_tfms)
+    base_ds = datasets.ImageFolder(data_dir, transform=train_tfms, target_transform=target_transform)
 
     split = float(getattr(cfg.dataset, "trainValSplit", 0.8))
     seed = int(getattr(cfg.dataset, "seed", 42))
@@ -106,12 +137,13 @@ def get_datasets(cfg, device="cpu") -> Tuple[torch.utils.data.Dataset, torch.uti
     return train_ds, val_ds, classes
 
 
-def get_dataloaders(cfg, device="cpu"):
-    train_ds, val_ds, classes = get_datasets(cfg, device)
+def get_dataloaders(cfg, device="cpu", transform=None):
+    train_ds, val_ds, classes = get_datasets(cfg, device, transform)
 
     batch_size = int(cfg.batchSize)
     num_workers = int(getattr(cfg.dataset, "numWorkers", 4))
-    pin_memory = torch.cuda.is_available()
+    # pin_memory = torch.cuda.is_available()
+    pin_memory = False
 
     train_loader = DataLoader(
         train_ds,
@@ -125,7 +157,7 @@ def get_dataloaders(cfg, device="cpu"):
     val_loader = DataLoader(
         val_ds,
         batch_size=batch_size,
-        shuffle=False,
+        shuffle=True,
         num_workers=num_workers,
         pin_memory=pin_memory,
         generator=torch.Generator(device=device)
