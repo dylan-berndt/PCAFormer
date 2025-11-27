@@ -68,6 +68,8 @@ class PCAFormerLayer(nn.Module):
                 x2 = torch.transpose(x1, 1, 2)
                 x = torch.cat([x[:, 0].unsqueeze(1), x2], dim=1)
 
+        self.lastPCA = x
+
         i = x
         x = self.ln1(x)
         x, _ = self.attn(x, x, x, need_weights=False)
